@@ -1,0 +1,93 @@
+Waqar Nabi, Glasgow, Nov 2017
+
+=====
+ABOUT
+=====
+A barebones opencl synthetic application to experiment with pipes/channels.
+Intended targets are:
+CPU : Inter CPU (Host used as "device")
+AOCL: Altera FPGA on BOLAMA
+This can be extended for GPUs and other OPenCL devices. There are some 
+artefacts in the code that refer to GPU targets, but the code has not been 
+tested on GPUs yet.
+
+
+=============
+REQUIREMENTS
+=============
+
+1. For Altera-OpenCL (AOCL), you need the aoc compiler and appropriate licenses. This code has been tested with aocl/15.1, with OpenCL 1.2, on bolama@glasgow
+
+2. For Intel CPU targets, you need Intel's OpenCL drivers and runtime installed, with OpenCL version 2.1. You can get it from here:
+https://software.intel.com/en-us/articles/opencl-drivers#latest_linux_SDK_release
+
+=====
+BUILD
+=====
+
+CPU (HOST-ONLY) TARGET
+-----------------------
+
+/1/
+if using modules, make sure AOCL is unloaded, e.g.:
+> module unload aocl/15.1
+
+/2/
+a) baseline (no channels):
+> cd build_CPU
+> make
+> ./host.exe
+
+b) channelized:
+> cd build_CPU
+> make CHANNELS=1
+> ./host.exe
+
+c) channelized and DEADLOCKED:
+> cd build_CPU
+> make CHANNELS=1 DEADLOCK=1
+> ./host.exe
+
+ALTERA-OCL
+----------
+/1/
+if using modules, make sure AOCL is loaded, e.g.:
+> module load aocl/15.1
+
+
+/2/
+a) baseline (no channels):
+cd build_AOCL
+. ./build_and_run_emu_NOchannels.sh (for emulation)
+. ./build_and_run_hw_NOchannels     (for full hardware sythesis) 
+
+b) channelized:
+cd build_AOCL
+. ./build_and_run_emu_channels.sh (for emulation)
+. ./build_and_run_hw_channels     (for full hardware sythesis) 
+
+c) channelized and DEADLOCKED:
+cd build_AOCL
+. ./build_and_run_emu_channels_withDeadlock (for emulation)
+. ./build_and_run_hw_channels_withDeadlock  (for full hardware sythesis) 
+
+=====
+NOTES
+=====
+1. AOCL version uses "channels" which are by default *blocking*, so there
+is no issues of synchronization across kernels as read/write channel calls act
+as synchronization points. So we launch *concurrent* kernels on multiple commands queus.
+
+2. CPU target on the other hand uses *non-blocking* pipe calls, and if we 
+naively launch multiple kernels on multiple command queues, then order of kernel executions is non-deterministic and we can get incorrect data. One opion would be to have some sort of synchronization points acrioss concurrent
+kernels. But I have taken the easy way out and simply create *one* command queue on the host. This ensures kernels are executed in sequence, and that ensures data coherency. This is not most effecient, but we are able to model
+the deadlock behaviour which is the purpose here.
+
+
+
+2. DEADLOCK is injected by trying to read more times from a pipe/channel than it is written (that is, chaning the loop bounds of the consumer).
+
+3. DEBUG:: (kernel echoes messages to the screen)
+- CPU/GPU is *always* run in debug mode.
+- AOCL *emulation* is always run  in debug mode
+- AOCL *hw* is never run in debug mode.
